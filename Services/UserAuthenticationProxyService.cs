@@ -8,7 +8,7 @@ namespace poplensUserProfileApi.Services {
 
     public class UserAuthenticationApiProxyService : IUserAuthenticationApiProxyService {
         private readonly IHttpClientFactory _httpClientFactory;
-        private readonly string _userAuthenticationApiUrl = "https://localhost:7019/api/";
+        private readonly string _userAuthenticationApiUrl = "http://poplensUserAuthenticationApi:8080/api/";
 
         public UserAuthenticationApiProxyService(IHttpClientFactory httpClientFactory) {
             _httpClientFactory = httpClientFactory;

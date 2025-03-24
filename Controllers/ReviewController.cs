@@ -1,5 +1,7 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using poplensUserProfileApi.Contracts;
+using poplensUserProfileApi.Models;
 using poplensUserProfileApi.Models.Dtos;
 
 namespace poplensUserProfileApi.Controllers {
@@ -26,16 +28,19 @@ namespace poplensUserProfileApi.Controllers {
             return NoContent();
         }
 
+        [Authorize(AuthenticationSchemes = "Bearer")]
         [HttpGet("{profileId}/reviews")]
         public async Task<IActionResult> GetReviewsByProfileId(Guid profileId, int page = 1, int pageSize = 10) {
             var reviews = await _reviewService.GetReviewsByProfileIdAsync(profileId, page, pageSize);
-            if (reviews == null || !reviews.Any()) {
-                return NotFound("No reviews found for this profile.");
-            }
-
             return Ok(reviews);
         }
 
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        [HttpGet("GetReviewsByProfileIds")]
+        public async Task<IActionResult> GetReviewsByProfileIds([FromQuery] List<Guid> profileIds, int page = 1, int pageSize = 10) {
+            var reviews = await _reviewService.GetReviewsByProfileIdsAsync(profileIds, page, pageSize);
+            return Ok(reviews);
+        }
     }
 
 }

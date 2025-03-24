@@ -13,7 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Register DbContext with PostgreSQL connection string
 builder.Services.AddDbContext<UserProfileDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql("Host=postgresProfile;Port=5432;Username=postgre;Password=postgre;Database=Profile"));
 
 // Register ProfileService
 builder.Services.AddScoped<IProfileService, ProfileService>();
@@ -32,9 +32,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = issuer!,
-            ValidAudience = audience!,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey!))
+            ValidIssuer = "YourIssuer",
+            ValidAudience = "YourAudience",
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("moresimplekeyrightherefolkssssssssssssss"))
         };
     });
 
@@ -47,11 +47,9 @@ builder.Services.AddSwaggerGen();
 var app = builder.Build();
 
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment()) {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
+
 
 
 app.UseHttpsRedirection();

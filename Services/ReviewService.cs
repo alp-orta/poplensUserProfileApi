@@ -64,7 +64,20 @@ namespace poplensUserProfileApi.Services
             return reviews;
         }
 
+        public async Task<List<Review>> GetReviewsByProfileIdsAsync(List<Guid> profileIds, int page = 1, int pageSize = 10) {
+            if (profileIds == null || !profileIds.Any()) {
+                return new List<Review>();
+            }
 
+            var reviews = await _context.Reviews
+                .Where(r => profileIds.Contains(r.ProfileId))
+                .OrderByDescending(r => r.CreatedDate)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return reviews;
+        }
     }
 
 }

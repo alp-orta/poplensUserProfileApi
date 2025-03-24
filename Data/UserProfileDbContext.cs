@@ -2,7 +2,6 @@
 using poplensUserProfileApi.Models;
 
 namespace poplensUserProfileApi.Data {
-    // UserProfileDbContext.cs
     public class UserProfileDbContext : DbContext {
         public UserProfileDbContext(DbContextOptions<UserProfileDbContext> options) : base(options) { }
 
@@ -11,6 +10,9 @@ namespace poplensUserProfileApi.Data {
         public DbSet<Review> Reviews { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder) {
+            // Specify the schema
+            modelBuilder.HasDefaultSchema("public");
+
             modelBuilder.Entity<Profile>()
                 .HasMany(p => p.Followers)
                 .WithOne()
@@ -20,14 +22,14 @@ namespace poplensUserProfileApi.Data {
                 .HasMany(p => p.Following)
                 .WithOne()
                 .HasForeignKey(f => f.FollowerId);
+
             modelBuilder.Entity<Profile>()
-                .HasMany(p => p.Reviews) // A Profile has many Reviews
+                .HasMany(p => p.Reviews)
                 .WithOne()
-                .HasForeignKey(r => r.ProfileId) // The foreign key in the Review entity is ProfileId
-                .IsRequired(); // Make sure ProfileId is required (if needed)
+                .HasForeignKey(r => r.ProfileId)
+                .IsRequired();
 
             base.OnModelCreating(modelBuilder);
         }
     }
-
 }

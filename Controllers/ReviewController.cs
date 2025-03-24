@@ -14,13 +14,15 @@ namespace poplensUserProfileApi.Controllers {
             _reviewService = reviewService;
         }
 
-        [HttpPost("{profileId}/addReview")]
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        [HttpPost("{profileId}/AddReview")]
         public async Task<IActionResult> AddReview(Guid profileId, [FromBody] CreateReviewRequest request) {
             await _reviewService.AddReviewAsync(profileId, request);
             return NoContent();
         }
 
-        [HttpDelete("{profileId}/deleteReview/{mediaId}")]
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        [HttpDelete("{profileId}/DeleteReview/{mediaId}")]
         public async Task<IActionResult> DeleteReview(Guid profileId, string mediaId) {
             var result = await _reviewService.DeleteReviewAsync(profileId, mediaId);
             if (!result) return NotFound();

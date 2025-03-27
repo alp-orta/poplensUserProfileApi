@@ -43,6 +43,27 @@ namespace poplensUserProfileApi.Controllers {
             var reviews = await _reviewService.GetReviewsByProfileIdsAsync(profileIds, page, pageSize);
             return Ok(reviews);
         }
+
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        [HttpGet("GetMediaMainPageReviewInfo/{mediaId}")]
+        public async Task<IActionResult> GetMediaMainPageReviewInfo(string mediaId) {
+            var token = GetTokenFromRequest();
+            var reviews = await _reviewService.GetMediaMainPageReviewInfo(mediaId, token);
+            return Ok(reviews);
+        }
+
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        [HttpGet("GetMediaReviews/{mediaId}")]
+        public async Task<IActionResult> GetMediaReviews(string mediaId, int page = 1, int pageSize = 10, string sortOption = "mostrecent") {
+            var token = GetTokenFromRequest();
+            var reviews = await _reviewService.GetMediaReviews(mediaId, page, pageSize, sortOption, token);
+            return Ok(reviews);
+        }
+
+        private string GetTokenFromRequest() {
+            return Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        }
+
     }
 
 }

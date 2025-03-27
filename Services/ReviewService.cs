@@ -3,14 +3,18 @@ using poplensUserProfileApi.Models.Dtos;
 using poplensUserProfileApi.Models;
 using poplensUserProfileApi.Contracts;
 using Microsoft.EntityFrameworkCore;
+using poplensUserProfileApi.Models.Common;
+using System.Net.Http;
 
 namespace poplensUserProfileApi.Services
 {
     public class ReviewService : IReviewService {
         private readonly UserProfileDbContext _context;
+        private readonly IUserAuthenticationApiProxyService _userAuthenticationApiProxyService;
 
-        public ReviewService(UserProfileDbContext context) {
+        public ReviewService(UserProfileDbContext context, IUserAuthenticationApiProxyService userAuthenticationApiProxyService) {
             _context = context;
+            _userAuthenticationApiProxyService = userAuthenticationApiProxyService;
         }
 
         public async Task AddReviewAsync(Guid profileId, CreateReviewRequest request) {
@@ -77,6 +81,107 @@ namespace poplensUserProfileApi.Services
                 .ToListAsync();
 
             return reviews;
+        }
+
+        public async Task<MediaMainPageReviewInfo> GetMediaMainPageReviewInfo(string mediaId, string token) {
+            // Get all reviews for the specified mediaId
+            var reviews = await _context.Reviews
+                .Where(r => r.MediaId == mediaId)
+                .ToListAsync();
+
+            // Extract profile IDs from reviews
+            var profileIds = reviews.Select(r => r.ProfileId.ToString()).ToList();
+
+            // Get usernames by profile IDs
+            var usernames = await _userAuthenticationApiProxyService.GetUsernamesByIdsAsync(profileIds, token);
+
+            // Map reviews to ReviewWithUsername
+            var reviewsWithUsernames = reviews.Select(r => new ReviewWithUsername {
+                Id = r.Id,
+                Content = r.Content,
+                Rating = r.Rating,
+                ProfileId = r.ProfileId,
+                MediaId = r.MediaId,
+                CreatedDate = r.CreatedDate,
+                LastUpdatedDate = r.LastUpdatedDate,
+                Username = usernames.ContainsKey(r.ProfileId) ? usernames[r.ProfileId] : "Unknown"
+            }).ToList();
+
+            // Calculate rating chart info
+            var ratingChartInfo = reviewsWithUsernames
+                .GroupBy(r => r.Rating)
+                .ToDictionary(g => g.Key, g => (float)g.Count());
+
+            // Get popular reviews (e.g., top 5 reviews with the highest ratings)
+            var popularReviews = reviewsWithUsernames
+                .OrderByDescending(r => r.Rating)
+                .ThenByDescending(r => r.CreatedDate)
+                .Take(5)
+                .ToList();
+
+            // Get recent reviews (e.g., top 5 most recent reviews)
+            var recentReviews = reviewsWithUsernames
+                .OrderByDescending(r => r.CreatedDate)
+                .Take(5)
+                .ToList();
+
+            // Create and return the MediaMainPageReviewInfo object
+            var mediaMainPageReviewInfo = new MediaMainPageReviewInfo {
+                RatingChartInfo = ratingChartInfo,
+                PopularReviews = popularReviews,
+                RecentReviews = recentReviews
+            };
+
+            return mediaMainPageReviewInfo;
+        }
+
+        public async Task<PageResult<ReviewWithUsername>> GetMediaReviews(string mediaId, int page, int pageSize, string sortOption, string token) {
+            var query = _context.Reviews.Where(r => r.MediaId == mediaId);
+
+            switch (sortOption.ToLower()) {
+                case "highestrated":
+                    query = query.OrderByDescending(r => r.Rating);
+                    break;
+                case "lowestrated":
+                    query = query.OrderBy(r => r.Rating);
+                    break;
+                case "mostrecent":
+                    query = query.OrderByDescending(r => r.CreatedDate);
+                    break;
+                default:
+                    throw new ArgumentException("Invalid sort option");
+            }
+            var totalItems = await query.CountAsync();
+            var reviews = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            var profileIds = reviews.Select(r => r.ProfileId.ToString()).ToList();
+
+            // Get usernames by profile IDs
+            var usernames = await _userAuthenticationApiProxyService.GetUsernamesByIdsAsync(profileIds, token);
+
+            // Map reviews to ReviewWithUsername
+            var reviewsWithUsernames = reviews.Select(r => new ReviewWithUsername {
+                Id = r.Id,
+                Content = r.Content,
+                Rating = r.Rating,
+                ProfileId = r.ProfileId,
+                MediaId = r.MediaId,
+                CreatedDate = r.CreatedDate,
+                LastUpdatedDate = r.LastUpdatedDate,
+                Username = usernames.ContainsKey(r.ProfileId) ? usernames[r.ProfileId] : "Unknown"
+            }).ToList();
+
+            var pageResult = new PageResult<ReviewWithUsername> {
+                Result = reviewsWithUsernames,
+                TotalCount = totalItems,
+                Page = page,
+                PageSize = pageSize
+            };
+
+            return pageResult;
         }
     }
 

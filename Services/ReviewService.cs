@@ -91,9 +91,14 @@ namespace poplensUserProfileApi.Services
 
             // Extract profile IDs from reviews
             var profileIds = reviews.Select(r => r.ProfileId.ToString()).ToList();
+            var profilIdToUserIdMap = await _context.Profiles
+                .Where(p => profileIds.Contains(p.Id.ToString()))
+                .ToDictionaryAsync(p => p.Id, p => p.UserId);
+            var userIds = profilIdToUserIdMap.Values.ToList();
 
             // Get usernames by profile IDs
-            var usernames = await _userAuthenticationApiProxyService.GetUsernamesByIdsAsync(profileIds, token);
+
+            var usernames = await _userAuthenticationApiProxyService.GetUsernamesByIdsAsync(userIds, token);
 
             // Map reviews to ReviewWithUsername
             var reviewsWithUsernames = reviews.Select(r => new ReviewWithUsername {
@@ -104,7 +109,7 @@ namespace poplensUserProfileApi.Services
                 MediaId = r.MediaId,
                 CreatedDate = r.CreatedDate,
                 LastUpdatedDate = r.LastUpdatedDate,
-                Username = usernames.ContainsKey(r.ProfileId) ? usernames[r.ProfileId] : "Unknown"
+                Username = usernames.ContainsKey(new Guid(profilIdToUserIdMap[r.ProfileId])) ? usernames[new Guid(profilIdToUserIdMap[r.ProfileId])] : "Unknown"
             }).ToList();
 
             // Calculate rating chart info

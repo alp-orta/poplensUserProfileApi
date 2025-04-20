@@ -5,6 +5,7 @@ using System.Net.Http.Headers;
 namespace poplensUserProfileApi.Services {
     public interface IMediaApiProxyService {
         Task<Media> GetMediaByIdAsync(Guid id, string authorizationToken);
+        Task<bool> IncrementTotalReviewCountAsync(Guid id, string authorizationToken);
     }
     public class MediaApiProxyService : IMediaApiProxyService {
         private readonly IHttpClientFactory _httpClientFactory;
@@ -32,6 +33,13 @@ namespace poplensUserProfileApi.Services {
 
             var mediaJson = await response.Content.ReadAsStringAsync();
             return JsonConvert.DeserializeObject<Media>(mediaJson);
+        }
+
+        public async Task<bool> IncrementTotalReviewCountAsync(Guid id, string authorizationToken) {
+            var client = CreateHttpClientWithAuthorization(authorizationToken);
+            var response = await client.PostAsync($"{_mediaApiUrl}Media/IncrementTotalReviewCount/{id}", null);
+
+            return response.IsSuccessStatusCode;
         }
     }
 }

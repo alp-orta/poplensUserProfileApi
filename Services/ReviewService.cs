@@ -11,13 +11,15 @@ namespace poplensUserProfileApi.Services
     public class ReviewService : IReviewService {
         private readonly UserProfileDbContext _context;
         private readonly IUserAuthenticationApiProxyService _userAuthenticationApiProxyService;
+        private readonly IMediaApiProxyService _mediaApiProxyService;
 
-        public ReviewService(UserProfileDbContext context, IUserAuthenticationApiProxyService userAuthenticationApiProxyService) {
+        public ReviewService(UserProfileDbContext context, IUserAuthenticationApiProxyService userAuthenticationApiProxyService, IMediaApiProxyService mediaApiProxyService) {
             _context = context;
             _userAuthenticationApiProxyService = userAuthenticationApiProxyService;
+            _mediaApiProxyService = mediaApiProxyService;
         }
 
-        public async Task AddReviewAsync(Guid profileId, CreateReviewRequest request) {
+        public async Task AddReviewAsync(Guid profileId, CreateReviewRequest request, string token) {
             if (request == null || string.IsNullOrEmpty(request.Content) || request.Rating <= 0) {
                 throw new Exception("Invalid review data.");
             }
@@ -31,6 +33,9 @@ namespace poplensUserProfileApi.Services
                 existingReview.LastUpdatedDate = DateTime.UtcNow;
                 await _context.SaveChangesAsync();
                 return;
+            }
+            if (!await _mediaApiProxyService.IncrementTotalReviewCountAsync(new Guid(request.MediaId), token)) {
+                throw new Exception("Error while incrementing media total review Count");
             }
 
             var review = new Review {

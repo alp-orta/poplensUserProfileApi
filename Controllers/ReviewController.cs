@@ -17,7 +17,8 @@ namespace poplensUserProfileApi.Controllers {
         [Authorize(AuthenticationSchemes = "Bearer")]
         [HttpPost("{profileId}/AddReview")]
         public async Task<IActionResult> AddReview(Guid profileId, [FromBody] CreateReviewRequest request) {
-            await _reviewService.AddReviewAsync(profileId, request);
+            var token = GetTokenFromRequest();
+            await _reviewService.AddReviewAsync(profileId, request, token);
             return NoContent();
         }
 

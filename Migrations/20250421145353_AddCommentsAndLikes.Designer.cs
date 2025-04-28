@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using poplensUserProfileApi.Data;
@@ -11,9 +12,11 @@ using poplensUserProfileApi.Data;
 namespace poplensUserProfileApi.Migrations
 {
     [DbContext(typeof(UserProfileDbContext))]
-    partial class UserProfileDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250421145353_AddCommentsAndLikes")]
+    partial class AddCommentsAndLikes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -40,9 +43,6 @@ namespace poplensUserProfileApi.Migrations
                     b.Property<DateTime>("LastUpdatedDate")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<Guid?>("ParentCommentId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("ProfileId")
                         .HasColumnType("uuid");
 
@@ -50,8 +50,6 @@ namespace poplensUserProfileApi.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("ParentCommentId");
 
                     b.HasIndex("ReviewId");
 
@@ -207,18 +205,11 @@ namespace poplensUserProfileApi.Migrations
 
             modelBuilder.Entity("poplensUserProfileApi.Models.Comment", b =>
                 {
-                    b.HasOne("poplensUserProfileApi.Models.Comment", "ParentComment")
-                        .WithMany("Replies")
-                        .HasForeignKey("ParentCommentId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("poplensUserProfileApi.Models.Review", null)
                         .WithMany()
                         .HasForeignKey("ReviewId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("ParentComment");
                 });
 
             modelBuilder.Entity("poplensUserProfileApi.Models.Follow", b =>
@@ -261,11 +252,6 @@ namespace poplensUserProfileApi.Migrations
                         .HasForeignKey("ProfileId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-                });
-
-            modelBuilder.Entity("poplensUserProfileApi.Models.Comment", b =>
-                {
-                    b.Navigation("Replies");
                 });
 
             modelBuilder.Entity("poplensUserProfileApi.Models.Profile", b =>

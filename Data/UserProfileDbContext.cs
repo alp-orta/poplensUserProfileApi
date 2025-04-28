@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using poplensUserProfileApi.Data.Configurations;
 using poplensUserProfileApi.Models;
 
 namespace poplensUserProfileApi.Data {
@@ -8,6 +9,8 @@ namespace poplensUserProfileApi.Data {
         public DbSet<Profile> Profiles { get; set; }
         public DbSet<Follow> Follows { get; set; }
         public DbSet<Review> Reviews { get; set; }
+        public DbSet<Like> Likes { get; set; }
+        public DbSet<Comment> Comments { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder) {
             // Specify the schema
@@ -28,6 +31,9 @@ namespace poplensUserProfileApi.Data {
                 .WithOne()
                 .HasForeignKey(r => r.ProfileId)
                 .IsRequired();
+
+            modelBuilder.ApplyConfiguration(new CommentConfiguration());
+            modelBuilder.ApplyConfiguration(new LikeConfiguration());
 
             base.OnModelCreating(modelBuilder);
         }

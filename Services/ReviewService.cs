@@ -18,7 +18,9 @@ namespace poplensUserProfileApi.Services
             _userAuthenticationApiProxyService = userAuthenticationApiProxyService;
             _mediaApiProxyService = mediaApiProxyService;
         }
-
+        // ────────────────────────────────────────────────────────────
+        // Reviews
+        // ────────────────────────────────────────────────────────────
         public async Task AddReviewAsync(Guid profileId, CreateReviewRequest request, string token) {
             if (request == null || string.IsNullOrEmpty(request.Content) || request.Rating <= 0) {
                 throw new Exception("Invalid review data.");
@@ -192,6 +194,133 @@ namespace poplensUserProfileApi.Services
             };
 
             return pageResult;
+        }
+
+        // ────────────────────────────────────────────────────────────
+        // Likes
+        // ────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Adds a like for the given review by the given profile.
+        /// </summary>
+        public async Task AddLikeAsync(Guid profileId, Guid reviewId) {
+            if (await _context.Likes.AnyAsync(l => l.ProfileId == profileId && l.ReviewId == reviewId))
+                throw new Exception("You have already liked this review.");
+
+            var like = new Like {
+                Id = Guid.NewGuid(),
+                ProfileId = profileId,
+                ReviewId = reviewId,
+                CreatedDate = DateTime.UtcNow
+            };
+            _context.Likes.Add(like);
+            await _context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Removes a like for the given review by the given profile.
+        /// </summary>
+        public async Task RemoveLikeAsync(Guid profileId, Guid reviewId) {
+            var like = await _context.Likes
+                .FirstOrDefaultAsync(l => l.ProfileId == profileId && l.ReviewId == reviewId);
+
+            if (like == null)
+                throw new Exception("Like not found.");
+
+            _context.Likes.Remove(like);
+            await _context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Gets the total number of likes for a review.
+        /// </summary>
+        public async Task<int> GetLikeCountAsync(Guid reviewId) {
+            return await _context.Likes.CountAsync(l => l.ReviewId == reviewId);
+        }
+
+        /// <summary>
+        /// Checks if a profile has liked a given review.
+        /// </summary>
+        public async Task<bool> HasUserLikedAsync(Guid profileId, Guid reviewId) {
+            return await _context.Likes.AnyAsync(l => l.ProfileId == profileId && l.ReviewId == reviewId);
+        }
+
+        // ────────────────────────────────────────────────────────────
+        // Comments (threaded)
+        // ────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Adds a new comment (or reply) to a review.
+        /// </summary>
+        public async Task AddCommentAsync(Guid profileId, Guid reviewId, CreateCommentRequest request) {
+            if (string.IsNullOrWhiteSpace(request.Content))
+                throw new Exception("Comment content cannot be empty.");
+
+            // If this is a reply, verify the parent exists
+            if (request.ParentCommentId.HasValue) {
+                var parent = await _context.Comments
+                    .FirstOrDefaultAsync(c => c.Id == request.ParentCommentId.Value && c.ReviewId == reviewId);
+                if (parent == null)
+                    throw new Exception("Parent comment not found or does not belong to this review.");
+            }
+
+            var comment = new Comment {
+                Id = Guid.NewGuid(),
+                ProfileId = profileId,
+                ReviewId = reviewId,
+                Content = request.Content,
+                ParentCommentId = request.ParentCommentId,
+                CreatedDate = DateTime.UtcNow,
+                LastUpdatedDate = DateTime.UtcNow
+            };
+
+            _context.Comments.Add(comment);
+            await _context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Updates the content of an existing comment.
+        /// </summary>
+        public async Task UpdateCommentAsync(Guid commentId, string newContent) {
+            var comment = await _context.Comments.FindAsync(commentId);
+            if (comment == null)
+                throw new Exception("Comment not found.");
+
+            comment.Content = newContent;
+            comment.LastUpdatedDate = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Deletes a comment (note: replies will remain, with their ParentCommentId unchanged).
+        /// </summary>
+        public async Task DeleteCommentAsync(Guid commentId) {
+            var comment = await _context.Comments.FindAsync(commentId);
+            if (comment == null)
+                throw new Exception("Comment not found.");
+
+            _context.Comments.Remove(comment);
+            await _context.SaveChangesAsync();
+        }
+
+        /// <summary>
+        /// Retrieves all top-level comments for a review, including one level of replies.
+        /// </summary>
+        public async Task<List<Comment>> GetTopLevelCommentsAsync(Guid reviewId) {
+            return await _context.Comments
+                .Where(c => c.ReviewId == reviewId && c.ParentCommentId == null)
+                .Include(c => c.Replies)         // first-level replies
+                .ToListAsync();
+        }
+
+        /// <summary>
+        /// Retrieves direct replies to a specific comment, including one more level of nested replies.
+        /// </summary>
+        public async Task<List<Comment>> GetRepliesAsync(Guid parentCommentId) {
+            return await _context.Comments
+                .Where(c => c.ParentCommentId == parentCommentId)
+                .Include(c => c.Replies)         // next-level replies
+                .ToListAsync();
         }
     }
 

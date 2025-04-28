@@ -14,6 +14,10 @@ namespace poplensUserProfileApi.Controllers {
             _reviewService = reviewService;
         }
 
+        private string GetTokenFromRequest() {
+            return Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        }
+
         [Authorize(AuthenticationSchemes = "Bearer")]
         [HttpPost("{profileId}/AddReview")]
         public async Task<IActionResult> AddReview(Guid profileId, [FromBody] CreateReviewRequest request) {
@@ -61,8 +65,66 @@ namespace poplensUserProfileApi.Controllers {
             return Ok(reviews);
         }
 
-        private string GetTokenFromRequest() {
-            return Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        [HttpPost("{profileId}/{reviewId}/Like")]
+        public async Task<IActionResult> AddLike(Guid profileId, Guid reviewId) {
+            await _reviewService.AddLikeAsync(profileId, reviewId);
+            return NoContent();
+        }
+
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        [HttpDelete("{profileId}/{reviewId}/Unlike")]
+        public async Task<IActionResult> RemoveLike(Guid profileId, Guid reviewId) {
+            await _reviewService.RemoveLikeAsync(profileId, reviewId);
+            return NoContent();
+        }
+
+        [HttpGet("{reviewId}/LikeCount")]
+        public async Task<IActionResult> GetLikeCount(Guid reviewId) {
+            var count = await _reviewService.GetLikeCountAsync(reviewId);
+            return Ok(count);
+        }
+
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        [HttpGet("{profileId}/{reviewId}/HasLiked")]
+        public async Task<IActionResult> HasUserLiked(Guid profileId, Guid reviewId) {
+            var hasLiked = await _reviewService.HasUserLikedAsync(profileId, reviewId);
+            return Ok(hasLiked);
+        }
+
+        // ────────────────────── Comments ──────────────────────
+
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        [HttpPost("{profileId}/{reviewId}/Comment")]
+        public async Task<IActionResult> AddComment(Guid profileId, Guid reviewId, [FromBody] CreateCommentRequest request) {
+            await _reviewService.AddCommentAsync(profileId, reviewId, request);
+            return NoContent();
+        }
+
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        [HttpPut("{commentId}/EditComment")]
+        public async Task<IActionResult> UpdateComment(Guid commentId, [FromBody] string newContent) {
+            await _reviewService.UpdateCommentAsync(commentId, newContent);
+            return NoContent();
+        }
+
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        [HttpDelete("{commentId}/DeleteComment")]
+        public async Task<IActionResult> DeleteComment(Guid commentId) {
+            await _reviewService.DeleteCommentAsync(commentId);
+            return NoContent();
+        }
+
+        [HttpGet("{reviewId}/TopLevelComments")]
+        public async Task<IActionResult> GetTopLevelComments(Guid reviewId) {
+            var comments = await _reviewService.GetTopLevelCommentsAsync(reviewId);
+            return Ok(comments);
+        }
+
+        [HttpGet("{parentCommentId}/Replies")]
+        public async Task<IActionResult> GetReplies(Guid parentCommentId) {
+            var replies = await _reviewService.GetRepliesAsync(parentCommentId);
+            return Ok(replies);
         }
 
     }

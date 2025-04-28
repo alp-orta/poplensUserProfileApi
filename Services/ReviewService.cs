@@ -5,6 +5,7 @@ using poplensUserProfileApi.Contracts;
 using Microsoft.EntityFrameworkCore;
 using poplensUserProfileApi.Models.Common;
 using System.Net.Http;
+using poplensMediaApi.Models;
 
 namespace poplensUserProfileApi.Services
 {
@@ -21,6 +22,89 @@ namespace poplensUserProfileApi.Services
         // ────────────────────────────────────────────────────────────
         // Reviews
         // ────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Gets a review by its unique identifier.
+        /// </summary>
+        /// <param name="reviewId">The unique identifier of the review</param>
+        /// <returns>The review if found, otherwise null</returns>
+        public async Task<Review> GetReviewByIdAsync(Guid reviewId) {
+            var review = await _context.Reviews
+                .FirstOrDefaultAsync(r => r.Id == reviewId);
+
+            return review;
+        }
+
+        /// <summary>
+        /// Gets detailed information about a review, including username and media information.
+        /// </summary>
+        /// <param name="reviewId">The unique identifier of the review</param>
+        /// <param name="token">The authorization token for API calls</param>
+        /// <returns>A ReviewDetail object with extended information</returns>
+        public async Task<ReviewDetail> GetReviewDetailAsync(Guid reviewId, string token) {
+            // Get the base review
+            var review = await _context.Reviews
+                .FirstOrDefaultAsync(r => r.Id == reviewId);
+
+            if (review == null)
+                return null;
+
+            // Get the profile and user info
+            var profile = await _context.Profiles
+                .FirstOrDefaultAsync(p => p.Id == review.ProfileId);
+
+            if (profile == null)
+                return null;
+
+            // Get username from auth service
+            var usernames = await _userAuthenticationApiProxyService.GetUsernamesByIdsAsync(
+                new List<string> { profile.UserId },
+                token);
+
+            // Get media details
+            var media = await _mediaApiProxyService.GetMediaByIdAsync(
+                Guid.Parse(review.MediaId),
+                token);
+
+            if (media == null)
+                return null;
+
+            // Create and populate the ReviewDetail object
+            var reviewDetail = new ReviewDetail {
+                Id = review.Id,
+                Content = review.Content,
+                Rating = review.Rating,
+                ProfileId = review.ProfileId,
+                MediaId = review.MediaId,
+                CreatedDate = review.CreatedDate,
+                LastUpdatedDate = review.LastUpdatedDate,
+                // Add media information
+                MediaTitle = media.Title,
+                MediaType = media.Type,
+                MediaCachedImagePath = media.CachedImagePath,
+                MediaCreator = GetCreator(media)
+            };
+
+            // Add username if available
+            if (usernames.ContainsKey(Guid.Parse(profile.UserId))) {
+                reviewDetail.Username = usernames[Guid.Parse(profile.UserId)];
+            } else {
+                reviewDetail.Username = "Unknown";
+            }
+
+            return reviewDetail;
+        }
+
+        private string GetCreator(Media media) {
+            return media.Type switch {
+                "film" => media.Director,
+                "book" => media.Writer,
+                "game" => media.Publisher,
+                _ => "Unknown"
+            };
+        }
+
+
         public async Task AddReviewAsync(Guid profileId, CreateReviewRequest request, string token) {
             if (request == null || string.IsNullOrEmpty(request.Content) || request.Rating <= 0) {
                 throw new Exception("Invalid review data.");
@@ -322,6 +406,17 @@ namespace poplensUserProfileApi.Services
                 .Include(c => c.Replies)         // next-level replies
                 .ToListAsync();
         }
+
+        /// <summary>
+        /// Gets the total number of comments for a review.
+        /// </summary>
+        /// <param name="reviewId">The unique identifier of the review</param>
+        /// <returns>The count of comments associated with the review</returns>
+        public async Task<int> GetCommentCountAsync(Guid reviewId) {
+            return await _context.Comments
+                .CountAsync(c => c.ReviewId == reviewId);
+        }
+
     }
 
 }

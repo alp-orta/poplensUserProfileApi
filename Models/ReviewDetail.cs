@@ -4,6 +4,7 @@
         public string Content { get; set; }
         public float Rating { get; set; }
         public Guid ProfileId { get; set; }
+        public string? Username { get; set; }
         public string MediaId { get; set; }
         public DateTime CreatedDate { get; set; }
         public DateTime LastUpdatedDate { get; set; }

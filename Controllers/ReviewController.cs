@@ -19,6 +19,27 @@ namespace poplensUserProfileApi.Controllers {
         }
 
         [Authorize(AuthenticationSchemes = "Bearer")]
+        [HttpGet("{reviewId}/GetReviewById")]
+        public async Task<IActionResult> GetReviewById(Guid reviewId) {
+            var review = await _reviewService.GetReviewByIdAsync(reviewId);
+            if (review == null) return NotFound();
+            return Ok(review);
+        }
+
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        [HttpGet("{reviewId}/GetReviewDetail")]
+        public async Task<IActionResult> GetReviewDetail(Guid reviewId) {
+            var token = GetTokenFromRequest();
+            var reviewDetail = await _reviewService.GetReviewDetailAsync(reviewId, token);
+
+            if (reviewDetail == null)
+                return NotFound();
+
+            return Ok(reviewDetail);
+        }
+
+
+        [Authorize(AuthenticationSchemes = "Bearer")]
         [HttpPost("{profileId}/AddReview")]
         public async Task<IActionResult> AddReview(Guid profileId, [FromBody] CreateReviewRequest request) {
             var token = GetTokenFromRequest();
@@ -125,6 +146,12 @@ namespace poplensUserProfileApi.Controllers {
         public async Task<IActionResult> GetReplies(Guid parentCommentId) {
             var replies = await _reviewService.GetRepliesAsync(parentCommentId);
             return Ok(replies);
+        }
+
+        [HttpGet("{reviewId}/CommentCount")]
+        public async Task<IActionResult> GetCommentCount(Guid reviewId) {
+            var count = await _reviewService.GetCommentCountAsync(reviewId);
+            return Ok(count);
         }
 
     }

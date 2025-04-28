@@ -9,7 +9,6 @@
         public DateTime LastUpdatedDate { get; set; } = DateTime.UtcNow;
 
         // Navigation properties
-        public Comment ParentComment { get; set; }
         public ICollection<Comment> Replies { get; set; } = new List<Comment>();
     }
 }

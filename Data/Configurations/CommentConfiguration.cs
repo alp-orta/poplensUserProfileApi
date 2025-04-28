@@ -29,10 +29,10 @@ namespace poplensUserProfileApi.Data.Configurations {
                 .OnDelete(DeleteBehavior.Cascade); // Cascade delete to remove comments when the review is deleted
 
             // Self - referencing relationship for nested comments
-            builder.HasOne(c => c.ParentComment)
-                .WithMany(c => c.Replies)
-                .HasForeignKey(c => c.ParentCommentId)
-                .OnDelete(DeleteBehavior.Restrict); // Restrict delete to avoid unintended deletions of child comments
+            builder.HasMany(c => c.Replies)
+                 .WithOne()  // No navigation property on the "many" side
+                 .HasForeignKey(c => c.ParentCommentId)
+                 .OnDelete(DeleteBehavior.Restrict);
         }
     }
 }

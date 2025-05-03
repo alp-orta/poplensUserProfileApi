@@ -138,13 +138,15 @@ namespace poplensUserProfileApi.Controllers {
 
         [HttpGet("{reviewId}/TopLevelComments")]
         public async Task<IActionResult> GetTopLevelComments(Guid reviewId) {
-            var comments = await _reviewService.GetTopLevelCommentsAsync(reviewId);
+            var token = GetTokenFromRequest();
+            var comments = await _reviewService.GetTopLevelCommentsAsync(reviewId, token);
             return Ok(comments);
         }
 
         [HttpGet("{parentCommentId}/Replies")]
         public async Task<IActionResult> GetReplies(Guid parentCommentId) {
-            var replies = await _reviewService.GetRepliesAsync(parentCommentId);
+            var token = GetTokenFromRequest();
+            var replies = await _reviewService.GetRepliesAsync(parentCommentId, token);
             return Ok(replies);
         }
 

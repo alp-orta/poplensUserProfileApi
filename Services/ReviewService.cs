@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using poplensUserProfileApi.Models.Common;
 using System.Net.Http;
 using poplensMediaApi.Models;
+using Newtonsoft.Json.Linq;
+using System.Linq;
 
 namespace poplensUserProfileApi.Services
 {
@@ -19,6 +21,7 @@ namespace poplensUserProfileApi.Services
             _userAuthenticationApiProxyService = userAuthenticationApiProxyService;
             _mediaApiProxyService = mediaApiProxyService;
         }
+        
         // ────────────────────────────────────────────────────────────
         // Reviews
         // ────────────────────────────────────────────────────────────
@@ -57,7 +60,7 @@ namespace poplensUserProfileApi.Services
                 return null;
 
             // Get username from auth service
-            var usernames = await _userAuthenticationApiProxyService.GetUsernamesByIdsAsync(
+            var usernames = await _userAuthenticationApiProxyService.GetUsernamesByUserIdsAsync(
                 new List<string> { profile.UserId },
                 token);
 
@@ -189,7 +192,7 @@ namespace poplensUserProfileApi.Services
 
             // Get usernames by profile IDs
 
-            var usernames = await _userAuthenticationApiProxyService.GetUsernamesByIdsAsync(userIds, token);
+            var usernames = await _userAuthenticationApiProxyService.GetUsernamesByUserIdsAsync(userIds, token);
 
             // Map reviews to ReviewWithUsername
             var reviewsWithUsernames = reviews.Select(r => new ReviewWithUsername {
@@ -256,7 +259,7 @@ namespace poplensUserProfileApi.Services
             var profileIds = reviews.Select(r => r.ProfileId.ToString()).ToList();
 
             // Get usernames by profile IDs
-            var usernames = await _userAuthenticationApiProxyService.GetUsernamesByIdsAsync(profileIds, token);
+            var usernames = await _userAuthenticationApiProxyService.GetUsernamesByUserIdsAsync(profileIds, token);
 
             // Map reviews to ReviewWithUsername
             var reviewsWithUsernames = reviews.Select(r => new ReviewWithUsername {
@@ -390,21 +393,50 @@ namespace poplensUserProfileApi.Services
         /// <summary>
         /// Retrieves all top-level comments for a review, including one level of replies.
         /// </summary>
-        public async Task<List<Comment>> GetTopLevelCommentsAsync(Guid reviewId) {
-            return await _context.Comments
+        public async Task<List<CommentDetail>> GetTopLevelCommentsAsync(Guid reviewId, string token) {
+            List<Comment> comments = await _context.Comments
                 .Where(c => c.ReviewId == reviewId && c.ParentCommentId == null)
                 .Include(c => c.Replies)         // first-level replies
                 .ToListAsync();
+            var profileIds = comments.Select(c => c.ProfileId).ToList();
+            var profileIdToUserIdMap = await _context.Profiles
+                .Where(p => profileIds.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, p => p.UserId);
+            var userIds = profileIdToUserIdMap.Values.ToList();
+            var usernames = await _userAuthenticationApiProxyService.GetUsernamesByUserIdsAsync(userIds, token);
+            List<CommentDetail> commentDetails = new List<CommentDetail>();
+            foreach (var comment in comments) {
+                CommentDetail commentDetail = new CommentDetail();
+                MapCommentToCommentDetail(comment, commentDetail);
+                commentDetail.Username = usernames.ContainsKey(new Guid(profileIdToUserIdMap[commentDetail.ProfileId])) ? usernames[new Guid(profileIdToUserIdMap[commentDetail.ProfileId])] : "Unknown";
+                commentDetails.Add(commentDetail);
+            }
+            return commentDetails;
         }
+
 
         /// <summary>
         /// Retrieves direct replies to a specific comment, including one more level of nested replies.
         /// </summary>
-        public async Task<List<Comment>> GetRepliesAsync(Guid parentCommentId) {
-            return await _context.Comments
+        public async Task<List<CommentDetail>> GetRepliesAsync(Guid parentCommentId, string token) {
+            List<Comment> comments = await _context.Comments
                 .Where(c => c.ParentCommentId == parentCommentId)
                 .Include(c => c.Replies)         // next-level replies
                 .ToListAsync();
+            var profileIds = comments.Select(c => c.ProfileId).ToList();
+            var profileIdToUserIdMap = await _context.Profiles
+                .Where(p => profileIds.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, p => p.UserId);
+            var userIds = profileIdToUserIdMap.Values.ToList();
+            var usernames = await _userAuthenticationApiProxyService.GetUsernamesByUserIdsAsync(userIds, token);
+            List<CommentDetail> commentDetails = new List<CommentDetail>();
+            foreach (var comment in comments) {
+                CommentDetail commentDetail = new CommentDetail();
+                MapCommentToCommentDetail(comment, commentDetail);
+                commentDetail.Username = usernames.ContainsKey(new Guid(profileIdToUserIdMap[commentDetail.ProfileId])) ? usernames[new Guid(profileIdToUserIdMap[commentDetail.ProfileId])] : "Unknown";
+                commentDetails.Add(commentDetail);
+            }
+            return commentDetails;
         }
 
         /// <summary>
@@ -415,6 +447,27 @@ namespace poplensUserProfileApi.Services
         public async Task<int> GetCommentCountAsync(Guid reviewId) {
             return await _context.Comments
                 .CountAsync(c => c.ReviewId == reviewId);
+        }
+
+        // ────────────────────────────────────────────────────────────
+        // Helpers
+        // ────────────────────────────────────────────────────────────
+        private async Task<List<string>> GetUserIIdsFromProfileIds(List<Guid> profileIds) {
+            var profilIdToUserIdMap = await _context.Profiles
+                .Where(p => profileIds.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, p => p.UserId);
+            return profilIdToUserIdMap.Values.ToList();
+        }
+
+        private void MapCommentToCommentDetail(Comment comment, CommentDetail commentDetail) {
+            commentDetail.Id = comment.Id;
+            commentDetail.ReviewId = comment.ReviewId;
+            commentDetail.ParentCommentId = comment.ParentCommentId;
+            commentDetail.ProfileId = comment.ProfileId;
+            commentDetail.Content = comment.Content;
+            commentDetail.CreatedDate = comment.CreatedDate;
+            commentDetail.LastUpdatedDate = comment.LastUpdatedDate;
+            commentDetail.Replies = comment.Replies;
         }
 
     }

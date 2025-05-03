@@ -135,7 +135,7 @@ namespace poplensUserProfileApi.Services {
                 .ToListAsync();
 
             // Get usernames from UserAuth API using the provided token
-            Dictionary<Guid, string> usernames = await _userAuthenticationApiProxyService.GetUsernamesByIdsAsync(followingUserIds, token);
+            Dictionary<Guid, string> usernames = await _userAuthenticationApiProxyService.GetUsernamesByUserIdsAsync(followingUserIds, token);
 
             // Map the results to FollowedProfile objects
             var followedProfiles = followingProfileIds.Select(id => {

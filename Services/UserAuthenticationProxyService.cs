@@ -3,7 +3,7 @@ using Newtonsoft.Json;
 
 namespace poplensUserProfileApi.Services {
     public interface IUserAuthenticationApiProxyService {
-        Task<Dictionary<Guid, string>> GetUsernamesByIdsAsync(List<string> userIds, string token);
+        Task<Dictionary<Guid, string>> GetUsernamesByUserIdsAsync(List<string> userIds, string token);
     }
 
     public class UserAuthenticationApiProxyService : IUserAuthenticationApiProxyService {
@@ -27,7 +27,7 @@ namespace poplensUserProfileApi.Services {
             return client;
         }
 
-        public async Task<Dictionary<Guid, string>> GetUsernamesByIdsAsync(List<string> userIds, string token) {
+        public async Task<Dictionary<Guid, string>> GetUsernamesByUserIdsAsync(List<string> userIds, string token) {
             var userGuids = userIds.Select(id => Guid.Parse(id)).ToList();
 
             var client = CreateHttpClientWithAuthorization(token);

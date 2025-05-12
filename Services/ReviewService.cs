@@ -183,16 +183,11 @@ namespace poplensUserProfileApi.Services
                 .Where(r => r.MediaId == mediaId)
                 .ToListAsync();
 
-            // Extract profile IDs from reviews
-            var profileIds = reviews.Select(r => r.ProfileId.ToString()).ToList();
-            var profilIdToUserIdMap = await _context.Profiles
-                .Where(p => profileIds.Contains(p.Id.ToString()))
-                .ToDictionaryAsync(p => p.Id, p => p.UserId);
-            var userIds = profilIdToUserIdMap.Values.ToList();
+            // Extract profile IDs for username lookup
+            var profileIds = reviews.Select(r => r.ProfileId).ToList();
 
-            // Get usernames by profile IDs
-
-            var usernames = await _userAuthenticationApiProxyService.GetUsernamesByUserIdsAsync(userIds, token);
+            // Get usernames using the helper method
+            var usernameMap = await GetUsernamesForProfileIdsAsync(profileIds, token);
 
             // Map reviews to ReviewWithUsername
             var reviewsWithUsernames = reviews.Select(r => new ReviewWithUsername {
@@ -203,7 +198,7 @@ namespace poplensUserProfileApi.Services
                 MediaId = r.MediaId,
                 CreatedDate = r.CreatedDate,
                 LastUpdatedDate = r.LastUpdatedDate,
-                Username = usernames.ContainsKey(new Guid(profilIdToUserIdMap[r.ProfileId])) ? usernames[new Guid(profilIdToUserIdMap[r.ProfileId])] : "Unknown"
+                Username = usernameMap.TryGetValue(r.ProfileId, out var username) ? username : "Unknown"
             }).ToList();
 
             // Calculate rating chart info
@@ -211,27 +206,25 @@ namespace poplensUserProfileApi.Services
                 .GroupBy(r => r.Rating)
                 .ToDictionary(g => g.Key, g => (float)g.Count());
 
-            // Get popular reviews (e.g., top 5 reviews with the highest ratings)
+            // Get popular reviews (top 5 reviews with the highest ratings)
             var popularReviews = reviewsWithUsernames
                 .OrderByDescending(r => r.Rating)
                 .ThenByDescending(r => r.CreatedDate)
                 .Take(5)
                 .ToList();
 
-            // Get recent reviews (e.g., top 5 most recent reviews)
+            // Get recent reviews (top 5 most recent reviews)
             var recentReviews = reviewsWithUsernames
                 .OrderByDescending(r => r.CreatedDate)
                 .Take(5)
                 .ToList();
 
             // Create and return the MediaMainPageReviewInfo object
-            var mediaMainPageReviewInfo = new MediaMainPageReviewInfo {
+            return new MediaMainPageReviewInfo {
                 RatingChartInfo = ratingChartInfo,
                 PopularReviews = popularReviews,
                 RecentReviews = recentReviews
             };
-
-            return mediaMainPageReviewInfo;
         }
 
         public async Task<PageResult<ReviewWithUsername>> GetMediaReviews(string mediaId, int page, int pageSize, string sortOption, string token) {
@@ -250,16 +243,18 @@ namespace poplensUserProfileApi.Services
                 default:
                     throw new ArgumentException("Invalid sort option");
             }
+
             var totalItems = await query.CountAsync();
             var reviews = await query
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
 
-            var profileIds = reviews.Select(r => r.ProfileId.ToString()).ToList();
+            // Extract profile IDs for username lookup
+            var profileIds = reviews.Select(r => r.ProfileId).ToList();
 
-            // Get usernames by profile IDs
-            var usernames = await _userAuthenticationApiProxyService.GetUsernamesByUserIdsAsync(profileIds, token);
+            // Get usernames using the helper method
+            var usernameMap = await GetUsernamesForProfileIdsAsync(profileIds, token);
 
             // Map reviews to ReviewWithUsername
             var reviewsWithUsernames = reviews.Select(r => new ReviewWithUsername {
@@ -270,18 +265,17 @@ namespace poplensUserProfileApi.Services
                 MediaId = r.MediaId,
                 CreatedDate = r.CreatedDate,
                 LastUpdatedDate = r.LastUpdatedDate,
-                Username = usernames.ContainsKey(r.ProfileId) ? usernames[r.ProfileId] : "Unknown"
+                Username = usernameMap.TryGetValue(r.ProfileId, out var username) ? username : "Unknown"
             }).ToList();
 
-            var pageResult = new PageResult<ReviewWithUsername> {
+            return new PageResult<ReviewWithUsername> {
                 Result = reviewsWithUsernames,
                 TotalCount = totalItems,
                 Page = page,
                 PageSize = pageSize
             };
-
-            return pageResult;
         }
+
 
         // ────────────────────────────────────────────────────────────
         // Likes
@@ -391,53 +385,131 @@ namespace poplensUserProfileApi.Services
         }
 
         /// <summary>
-        /// Retrieves all top-level comments for a review, including one level of replies.
+        /// Retrieves all top-level comments for a review, including one level of replies with usernames.
         /// </summary>
         public async Task<List<CommentDetail>> GetTopLevelCommentsAsync(Guid reviewId, string token) {
+            // Fetch comments with replies
             List<Comment> comments = await _context.Comments
                 .Where(c => c.ReviewId == reviewId && c.ParentCommentId == null)
-                .Include(c => c.Replies)         // first-level replies
+                .Include(c => c.Replies)
                 .ToListAsync();
+
+            // Get all profile IDs from both top-level comments and replies
             var profileIds = comments.Select(c => c.ProfileId).ToList();
-            var profileIdToUserIdMap = await _context.Profiles
-                .Where(p => profileIds.Contains(p.Id))
-                .ToDictionaryAsync(p => p.Id, p => p.UserId);
-            var userIds = profileIdToUserIdMap.Values.ToList();
-            var usernames = await _userAuthenticationApiProxyService.GetUsernamesByUserIdsAsync(userIds, token);
+
+            // Add profile IDs from replies
+            foreach (var comment in comments) {
+                if (comment.Replies != null && comment.Replies.Any()) {
+                    profileIds.AddRange(comment.Replies.Select(r => r.ProfileId));
+                }
+            }
+
+            // Make profile IDs distinct
+            profileIds = profileIds.Distinct().ToList();
+
+            // Get usernames in a single method call
+            var usernameMap = await GetUsernamesForProfileIdsAsync(profileIds, token);
+
+            // Map comments to comment details with usernames
             List<CommentDetail> commentDetails = new List<CommentDetail>();
             foreach (var comment in comments) {
-                CommentDetail commentDetail = new CommentDetail();
-                MapCommentToCommentDetail(comment, commentDetail);
-                commentDetail.Username = usernames.ContainsKey(new Guid(profileIdToUserIdMap[commentDetail.ProfileId])) ? usernames[new Guid(profileIdToUserIdMap[commentDetail.ProfileId])] : "Unknown";
-                commentDetails.Add(commentDetail);
+                var detail = new CommentDetail();
+                MapCommentToCommentDetail(comment, detail);
+                detail.Username = usernameMap.TryGetValue(comment.ProfileId, out var username) ? username : "Unknown";
+
+                // Set the reply count
+                detail.ReplyCount = comment.Replies?.Count ?? 0;
+
+                // Process replies
+                if (detail.Replies != null) {
+                    var replyDetails = new List<CommentDetail>();
+                    foreach (var reply in detail.Replies) {
+                        var replyDetail = new CommentDetail();
+                        // Copy properties
+                        MapCommentToCommentDetail(reply, replyDetail);
+                        // Add username
+                        replyDetail.Username = usernameMap.TryGetValue(reply.ProfileId, out var replyUsername) ? replyUsername : "Unknown";
+
+                        // Set nested reply count
+                        replyDetail.ReplyCount = await GetReplyCountAsync(reply.Id);
+
+                        replyDetails.Add(replyDetail);
+                    }
+
+                    // Replace the original replies with the detailed ones
+                    detail.DetailedReplies = replyDetails;
+                }
+
+                commentDetails.Add(detail);
             }
+
             return commentDetails;
         }
-
 
         /// <summary>
         /// Retrieves direct replies to a specific comment, including one more level of nested replies.
         /// </summary>
         public async Task<List<CommentDetail>> GetRepliesAsync(Guid parentCommentId, string token) {
+            // Fetch replies with their replies
             List<Comment> comments = await _context.Comments
                 .Where(c => c.ParentCommentId == parentCommentId)
-                .Include(c => c.Replies)         // next-level replies
+                .Include(c => c.Replies)
                 .ToListAsync();
+
+            // Get all profile IDs from both replies and nested replies
             var profileIds = comments.Select(c => c.ProfileId).ToList();
-            var profileIdToUserIdMap = await _context.Profiles
-                .Where(p => profileIds.Contains(p.Id))
-                .ToDictionaryAsync(p => p.Id, p => p.UserId);
-            var userIds = profileIdToUserIdMap.Values.ToList();
-            var usernames = await _userAuthenticationApiProxyService.GetUsernamesByUserIdsAsync(userIds, token);
+
+            // Add profile IDs from nested replies
+            foreach (var comment in comments) {
+                if (comment.Replies != null && comment.Replies.Any()) {
+                    profileIds.AddRange(comment.Replies.Select(r => r.ProfileId));
+                }
+            }
+
+            // Make profile IDs distinct
+            profileIds = profileIds.Distinct().ToList();
+
+            // Get usernames
+            var usernameMap = await GetUsernamesForProfileIdsAsync(profileIds, token);
+
+            // Map to comment details
             List<CommentDetail> commentDetails = new List<CommentDetail>();
             foreach (var comment in comments) {
-                CommentDetail commentDetail = new CommentDetail();
-                MapCommentToCommentDetail(comment, commentDetail);
-                commentDetail.Username = usernames.ContainsKey(new Guid(profileIdToUserIdMap[commentDetail.ProfileId])) ? usernames[new Guid(profileIdToUserIdMap[commentDetail.ProfileId])] : "Unknown";
-                commentDetails.Add(commentDetail);
+                var detail = new CommentDetail();
+                MapCommentToCommentDetail(comment, detail);
+                detail.Username = usernameMap.TryGetValue(comment.ProfileId, out var username) ? username : "Unknown";
+
+                // Set the reply count
+                detail.ReplyCount = comment.Replies?.Count ?? 0;
+
+                // Process nested replies
+                if (detail.Replies != null) {
+                    var replyDetails = new List<CommentDetail>();
+                    foreach (var reply in detail.Replies) {
+                        var replyDetail = new CommentDetail();
+                        // Copy properties
+                        MapCommentToCommentDetail(reply, replyDetail);
+                        // Add username
+                        replyDetail.Username = usernameMap.TryGetValue(reply.ProfileId, out var replyUsername) ? replyUsername : "Unknown";
+
+                        // Set nested reply count
+                        replyDetail.ReplyCount = await GetReplyCountAsync(reply.Id);
+
+                        replyDetails.Add(replyDetail);
+                    }
+
+                    // Replace the original replies with the detailed ones
+                    detail.DetailedReplies = replyDetails;
+                }
+
+                commentDetails.Add(detail);
             }
+
             return commentDetails;
         }
+
+
+
 
         /// <summary>
         /// Gets the total number of comments for a review.
@@ -449,15 +521,54 @@ namespace poplensUserProfileApi.Services
                 .CountAsync(c => c.ReviewId == reviewId);
         }
 
+        /// <summary>
+        /// Gets the total number of replies for a comment.
+        /// </summary>
+        /// <param name="parentCommentId">The unique identifier of the parent comment</param>
+        /// <returns>The count of replies associated with the comment</returns>
+        public async Task<int> GetReplyCountAsync(Guid parentCommentId) {
+            return await _context.Comments
+                .CountAsync(c => c.ParentCommentId == parentCommentId);
+        }
+
         // ────────────────────────────────────────────────────────────
         // Helpers
         // ────────────────────────────────────────────────────────────
-        private async Task<List<string>> GetUserIIdsFromProfileIds(List<Guid> profileIds) {
-            var profilIdToUserIdMap = await _context.Profiles
+
+        /// <summary>
+        /// Helper method to obtain usernames for a collection of comments.
+        /// </summary>
+        private async Task<Dictionary<Guid, string>> GetUsernamesForProfileIdsAsync(List<Guid> profileIds, string token) {
+            // Create a mapping dictionary to return
+            var profileIdToUsernameMap = new Dictionary<Guid, string>();
+
+            if (profileIds == null || !profileIds.Any())
+                return profileIdToUsernameMap;
+
+            // Get the userId for each profileId
+            var profileIdToUserIdMap = await _context.Profiles
                 .Where(p => profileIds.Contains(p.Id))
                 .ToDictionaryAsync(p => p.Id, p => p.UserId);
-            return profilIdToUserIdMap.Values.ToList();
+
+            // Get all userIds to fetch usernames in a single call
+            var userIds = profileIdToUserIdMap.Values.ToList();
+
+            // Get usernames for all userIds in one API call
+            var userIdToUsernameMap = await _userAuthenticationApiProxyService.GetUsernamesByUserIdsAsync(userIds, token);
+
+            // Map each profileId directly to its username
+            foreach (var profileId in profileIds) {
+                if (profileIdToUserIdMap.TryGetValue(profileId, out var userId) &&
+                    userIdToUsernameMap.TryGetValue(new Guid(userId), out var username)) {
+                    profileIdToUsernameMap[profileId] = username;
+                } else {
+                    profileIdToUsernameMap[profileId] = "Unknown";
+                }
+            }
+
+            return profileIdToUsernameMap;
         }
+
 
         private void MapCommentToCommentDetail(Comment comment, CommentDetail commentDetail) {
             commentDetail.Id = comment.Id;
@@ -468,6 +579,7 @@ namespace poplensUserProfileApi.Services
             commentDetail.CreatedDate = comment.CreatedDate;
             commentDetail.LastUpdatedDate = comment.LastUpdatedDate;
             commentDetail.Replies = comment.Replies;
+            commentDetail.ReplyCount = comment.Replies?.Count ?? 0;
         }
 
     }

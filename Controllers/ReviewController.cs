@@ -156,6 +156,12 @@ namespace poplensUserProfileApi.Controllers {
             return Ok(count);
         }
 
+        [HttpGet("{parentCommentId}/ReplyCount")]
+        public async Task<IActionResult> GetReplyCount(Guid parentCommentId) {
+            var count = await _reviewService.GetReplyCountAsync(parentCommentId);
+            return Ok(count);
+        }
+
     }
 
 }

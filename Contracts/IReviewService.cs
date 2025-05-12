@@ -25,5 +25,6 @@ namespace poplensUserProfileApi.Contracts {
         Task<List<CommentDetail>> GetTopLevelCommentsAsync(Guid reviewId, string token);
         Task<List<CommentDetail>> GetRepliesAsync(Guid parentCommentId, string token);
         Task<int> GetCommentCountAsync(Guid reviewId);
+        Task<int> GetReplyCountAsync(Guid parentCommentId);
     }
 }

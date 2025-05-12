@@ -1,4 +1,6 @@
-﻿namespace poplensUserProfileApi.Models {
+﻿using System.ComponentModel.DataAnnotations.Schema;
+
+namespace poplensUserProfileApi.Models {
     public class Comment {
         public Guid Id { get; set; }
         public Guid ReviewId { get; set; } // FK to the Review table
@@ -10,5 +12,8 @@
 
         // Navigation properties
         public ICollection<Comment> Replies { get; set; } = new List<Comment>();
+
+        [NotMapped]
+        public int ReplyCount { get; set; }
     }
 }

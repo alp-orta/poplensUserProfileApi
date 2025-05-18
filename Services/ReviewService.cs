@@ -33,8 +33,17 @@ namespace poplensUserProfileApi.Services
         /// <returns>The review if found, otherwise null</returns>
         public async Task<Review> GetReviewByIdAsync(Guid reviewId) {
             var review = await _context.Reviews
-                .FirstOrDefaultAsync(r => r.Id == reviewId);
-
+                .Where(r => r.Id == reviewId)
+                .Select(r => new Review {
+                    Id = r.Id,
+                    Content = r.Content,
+                    Rating = r.Rating,
+                    ProfileId = r.ProfileId,
+                    MediaId = r.MediaId,
+                    CreatedDate = r.CreatedDate,
+                    LastUpdatedDate = r.LastUpdatedDate
+                })
+                .FirstOrDefaultAsync();
             return review;
         }
 
@@ -46,8 +55,7 @@ namespace poplensUserProfileApi.Services
         /// <returns>A ReviewDetail object with extended information</returns>
         public async Task<ReviewDetail> GetReviewDetailAsync(Guid reviewId, string token) {
             // Get the base review
-            var review = await _context.Reviews
-                .FirstOrDefaultAsync(r => r.Id == reviewId);
+            var review = await GetReviewByIdAsync(reviewId);
 
             if (review == null)
                 return null;
@@ -153,12 +161,13 @@ namespace poplensUserProfileApi.Services
         }
 
         public async Task<List<Review>> GetReviewsByProfileIdAsync(Guid profileId, int page = 1, int pageSize = 10) {
-            var reviews = await _context.Reviews
+            var query = _context.Reviews
                 .Where(r => r.ProfileId == profileId)
                 .OrderByDescending(r => r.CreatedDate)
                 .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
+                .Take(pageSize);
+
+            var reviews = await GetReviewsWithoutEmbeddingAsync(query);
             return reviews;
         }
 
@@ -167,21 +176,21 @@ namespace poplensUserProfileApi.Services
                 return new List<Review>();
             }
 
-            var reviews = await _context.Reviews
+            var query = _context.Reviews
                 .Where(r => profileIds.Contains(r.ProfileId))
                 .OrderByDescending(r => r.CreatedDate)
                 .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
+                .Take(pageSize);
 
+            var reviews = await GetReviewsWithoutEmbeddingAsync(query);
             return reviews;
         }
 
         public async Task<MediaMainPageReviewInfo> GetMediaMainPageReviewInfo(string mediaId, string token) {
             // Get all reviews for the specified mediaId
-            var reviews = await _context.Reviews
-                .Where(r => r.MediaId == mediaId)
-                .ToListAsync();
+            var query = _context.Reviews
+                .Where(r => r.MediaId == mediaId);
+            var reviews = await GetReviewsWithoutEmbeddingAsync(query);
 
             // Extract profile IDs for username lookup
             var profileIds = reviews.Select(r => r.ProfileId).ToList();
@@ -228,7 +237,8 @@ namespace poplensUserProfileApi.Services
         }
 
         public async Task<PageResult<ReviewWithUsername>> GetMediaReviews(string mediaId, int page, int pageSize, string sortOption, string token) {
-            var query = _context.Reviews.Where(r => r.MediaId == mediaId);
+            var query = _context.Reviews
+                .Where(r => r.MediaId == mediaId);
 
             switch (sortOption.ToLower()) {
                 case "highestrated":
@@ -245,11 +255,11 @@ namespace poplensUserProfileApi.Services
             }
 
             var totalItems = await query.CountAsync();
-            var reviews = await query
+            query = query
                 .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
+                .Take(pageSize);
 
+            var reviews = await GetReviewsWithoutEmbeddingAsync(query);
             // Extract profile IDs for username lookup
             var profileIds = reviews.Select(r => r.ProfileId).ToList();
 
@@ -579,6 +589,22 @@ namespace poplensUserProfileApi.Services
             commentDetail.LastUpdatedDate = comment.LastUpdatedDate;
             commentDetail.Replies = comment.Replies;
             commentDetail.ReplyCount = comment.Replies?.Count ?? 0;
+        }
+
+        private async Task<List<Review>> GetReviewsWithoutEmbeddingAsync(IQueryable<Review> query) {
+            // Project only the fields you need, excluding Embedding
+            return await query
+                .Select(r => new Review {
+                    Id = r.Id,
+                    Content = r.Content,
+                    Rating = r.Rating,
+                    ProfileId = r.ProfileId,
+                    MediaId = r.MediaId,
+                    CreatedDate = r.CreatedDate,
+                    LastUpdatedDate = r.LastUpdatedDate
+                    // Embedding is not selected
+                })
+                .ToListAsync();
         }
 
     }

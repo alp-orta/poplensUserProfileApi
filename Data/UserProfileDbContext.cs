@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using poplensUserProfileApi.Data.Configurations;
 using poplensUserProfileApi.Models;
 
@@ -13,6 +14,7 @@ namespace poplensUserProfileApi.Data {
         public DbSet<Comment> Comments { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder) {
+            modelBuilder.HasPostgresExtension("vector");
             // Specify the schema
             modelBuilder.HasDefaultSchema("public");
 
@@ -32,10 +34,20 @@ namespace poplensUserProfileApi.Data {
                 .HasForeignKey(r => r.ProfileId)
                 .IsRequired();
 
+            modelBuilder.Entity<Review>()
+                .Property(r => r.Embedding)
+                .HasColumnType("vector(1536)");
+
             modelBuilder.ApplyConfiguration(new CommentConfiguration());
             modelBuilder.ApplyConfiguration(new LikeConfiguration());
 
             base.OnModelCreating(modelBuilder);
+        }
+
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) {
+            optionsBuilder.UseNpgsql("Host=postgresProfile;Port=5432;Username=postgre;Password=postgre;Database=Profile", o => o.UseVector());
+
+            base.OnConfiguring(optionsBuilder);
         }
     }
 }

@@ -569,7 +569,6 @@ namespace poplensUserProfileApi.Services
             return profileIdToUsernameMap;
         }
 
-
         private void MapCommentToCommentDetail(Comment comment, CommentDetail commentDetail) {
             commentDetail.Id = comment.Id;
             commentDetail.ReviewId = comment.ReviewId;

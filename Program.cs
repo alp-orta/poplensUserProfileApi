@@ -7,8 +7,6 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using DotNetEnv;
 
-Env.Load();
-
 var builder = WebApplication.CreateBuilder(args);
 
 // Register DbContext with PostgreSQL connection string
@@ -22,9 +20,6 @@ builder.Services.AddScoped<IUserAuthenticationApiProxyService, UserAuthenticatio
 builder.Services.AddScoped<IMediaApiProxyService, MediaApiProxyService>();
 builder.Services.AddHttpClient();
 
-string jwtKey = Environment.GetEnvironmentVariable("JWT_KEY");
-string issuer = Environment.GetEnvironmentVariable("JWT_ISSUER");
-string audience = Environment.GetEnvironmentVariable("JWT_AUDIENCE");
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options => {
         options.TokenValidationParameters = new TokenValidationParameters {

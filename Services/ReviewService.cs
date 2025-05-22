@@ -362,7 +362,7 @@ namespace poplensUserProfileApi.Services
         /// </summary>
         public async Task<List<Review>> GetCommentedReviewsWithEmbeddingsAsync(Guid profileId) {
             var commentedReviewIds = await _context.Comments
-                .Where(c => c.ProfileId == profileId)
+                .Where(c => c.ProfileId == profileId && c.ParentCommentId == null)
                 .Select(c => c.ReviewId)
                 .Distinct()
                 .ToListAsync();
@@ -373,32 +373,6 @@ namespace poplensUserProfileApi.Services
 
             return commentedReviews;
         }
-
-        /// <summary>
-        /// Gets reviews with embeddings similar to the provided embedding, excluding any already displayed to the user
-        /// </summary>
-        /// <param name="embedding">The embedding vector to match against</param>
-        /// <param name="count">Number of reviews to return</param>
-        /// <param name="excludedReviewIds">Optional list of review IDs to exclude from results</param>
-        /// <returns>List of similar reviews with their embeddings</returns>
-        public async Task<List<Review>> GetSimilarReviewsAsync(Vector embedding, int count, List<Guid>? excludedReviewIds = null) {
-            // Base query with embedding similarity using cosine distance
-            var query = _context.Reviews.Where(r => r.Embedding != null);
-
-            // If we have excluded review IDs, filter them out
-            if (excludedReviewIds != null && excludedReviewIds.Any()) {
-                query = query.Where(r => !excludedReviewIds.Contains(r.Id));
-            }
-
-            // Order by similarity and take the requested number
-            var reviews = await query
-                .OrderBy(r => r.Embedding.CosineDistance(embedding))
-                .Take(count)
-                .ToListAsync();
-
-            return reviews;
-        }
-
 
         /// <summary>
         /// Gets all user interactions (reviews, likes, comments) with embeddings in one request
@@ -418,6 +392,36 @@ namespace poplensUserProfileApi.Services
                 LikedReviews = likedReviews,
                 CommentedReviews = commentedReviews
             };
+        }
+
+        /// <summary>
+        /// Gets reviews with embeddings similar to the provided embedding, excluding any already displayed to the user
+        /// </summary>
+        /// <param name="embedding">The embedding vector to match against</param>
+        /// <param name="count">Number of reviews to return</param>
+        /// <param name="excludedReviewIds">Optional list of review IDs to exclude from results</param>
+        /// <returns>List of similar reviews with their embeddings</returns>
+        public async Task<List<Review>> GetSimilarReviewsAsync(Vector embedding, int count, List<Guid>? excludedReviewIds = null, Guid? requestingProfileId = null) {
+            // Base query with embedding similarity using cosine distance
+            var query = _context.Reviews.Where(r => r.Embedding != null);
+
+            // Exclude reviews by the requesting user
+            if (requestingProfileId.HasValue) {
+                query = query.Where(r => r.ProfileId != requestingProfileId.Value);
+            }
+
+            // If we have excluded review IDs, filter them out
+            if (excludedReviewIds != null && excludedReviewIds.Any()) {
+                query = query.Where(r => !excludedReviewIds.Contains(r.Id));
+            }
+
+            // Order by similarity and take the requested number
+            var reviews = await query
+                .OrderBy(r => r.Embedding.CosineDistance(embedding))
+                .Take(count)
+                .ToListAsync();
+
+            return reviews;
         }
 
 

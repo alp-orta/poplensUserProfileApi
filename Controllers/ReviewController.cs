@@ -136,7 +136,8 @@ namespace poplensUserProfileApi.Controllers {
             var reviews = await _reviewService.GetSimilarReviewsAsync(
                 embedding,
                 request.Count,
-                request.ExcludedReviewIds);
+                request.ExcludedReviewIds,
+                request.RequestingProfileId);
 
             return Ok(reviews);
         }

@@ -18,7 +18,7 @@ namespace poplensUserProfileApi.Contracts {
         Task<List<Review>> GetReviewsWithEmbeddingsAsync(Guid profileId);
         Task<List<Review>> GetLikedReviewsWithEmbeddingsAsync(Guid profileId);
         Task<List<Review>> GetCommentedReviewsWithEmbeddingsAsync(Guid profileId);
-        Task<List<Review>> GetSimilarReviewsAsync(Vector embedding, int count);
+        Task<List<Review>> GetSimilarReviewsAsync(Vector embedding, int count, List<Guid>? excludedReviewIds = null, Guid? requestingProfileId = null);
         Task<UserInteractionsResponse> GetUserInteractionsWithEmbeddingsAsync(Guid profileId);
 
         // ────────────────────── Likes ──────────────────────

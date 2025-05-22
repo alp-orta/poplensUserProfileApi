@@ -1,6 +1,8 @@
-﻿using poplensUserProfileApi.Models;
+﻿using Pgvector;
+using poplensUserProfileApi.Models;
 using poplensUserProfileApi.Models.Common;
 using poplensUserProfileApi.Models.Dtos;
+using poplensUserProfileApi.Models.Feed;
 
 namespace poplensUserProfileApi.Contracts {
     public interface IReviewService {
@@ -13,6 +15,12 @@ namespace poplensUserProfileApi.Contracts {
         Task<List<Review>> GetReviewsByProfileIdsAsync(List<Guid> profileIds, int page = 1, int pageSize = 10);
         Task<MediaMainPageReviewInfo> GetMediaMainPageReviewInfo(string mediaId, string token);
         Task<PageResult<ReviewWithUsername>> GetMediaReviews(string mediaId, int page, int pageSize, string sortOption, string token);
+        Task<List<Review>> GetReviewsWithEmbeddingsAsync(Guid profileId);
+        Task<List<Review>> GetLikedReviewsWithEmbeddingsAsync(Guid profileId);
+        Task<List<Review>> GetCommentedReviewsWithEmbeddingsAsync(Guid profileId);
+        Task<List<Review>> GetSimilarReviewsAsync(Vector embedding, int count);
+        Task<UserInteractionsResponse> GetUserInteractionsWithEmbeddingsAsync(Guid profileId);
+
         // ────────────────────── Likes ──────────────────────
         Task AddLikeAsync(Guid profileId, Guid reviewId);
         Task RemoveLikeAsync(Guid profileId, Guid reviewId);

@@ -8,5 +8,6 @@ namespace poplensUserProfileApi.Contracts {
         Task<bool> UnfollowAsync(Guid followerId, Guid followingId);
         Task<List<FollowedProfile>> GetFollowingListAsync(Guid profileId, string token);
         Task<Guid> GetProfileIdWithUserIdAsync(string userId, string token);
+        Task<List<FollowedProfile>> GetProfilesWithUsernamesAsync(List<Guid> profileIds, string token);
     }
 }

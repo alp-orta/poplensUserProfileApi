@@ -65,6 +65,23 @@ namespace poplensUserProfileApi.Controllers {
             return Ok(followingIds);
         }
 
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        [HttpGet("GetProfilesWithUsernames")]
+        public async Task<IActionResult> GetProfilesWithUsernames([FromQuery] List<Guid> profileIds) {
+            if (profileIds == null || !profileIds.Any()) {
+                return BadRequest("Profile IDs are required");
+            }
+
+            var token = GetTokenFromRequest();
+            var profiles = await _profileService.GetProfilesWithUsernamesAsync(profileIds, token);
+
+            if (profiles == null || !profiles.Any()) {
+                return NotFound("No profiles found with the specified IDs");
+            }
+
+            return Ok(profiles);
+        }
+
         private string GetTokenFromRequest() {
             return Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
         }

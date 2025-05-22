@@ -8,6 +8,9 @@ using System.Net.Http;
 using poplensMediaApi.Models;
 using Newtonsoft.Json.Linq;
 using System.Linq;
+using Pgvector.EntityFrameworkCore;
+using Pgvector;
+using poplensUserProfileApi.Models.Feed;
 
 namespace poplensUserProfileApi.Services
 {
@@ -323,6 +326,97 @@ namespace poplensUserProfileApi.Services
                 TotalCount = totalItems,
                 Page = page,
                 PageSize = pageSize
+            };
+        }
+
+        /// <summary>
+        /// Gets reviews with embeddings for a profile
+        /// </summary>
+        public async Task<List<Review>> GetReviewsWithEmbeddingsAsync(Guid profileId) {
+            var reviews = await _context.Reviews
+                .Where(r => r.ProfileId == profileId)
+                .OrderByDescending(r => r.CreatedDate)
+                .ToListAsync();
+
+            return reviews;
+        }
+
+        /// <summary>
+        /// Gets reviews that a profile has liked, including their embeddings
+        /// </summary>
+        public async Task<List<Review>> GetLikedReviewsWithEmbeddingsAsync(Guid profileId) {
+            var likedReviewIds = await _context.Likes
+                .Where(l => l.ProfileId == profileId)
+                .Select(l => l.ReviewId)
+                .ToListAsync();
+
+            var likedReviews = await _context.Reviews
+                .Where(r => likedReviewIds.Contains(r.Id))
+                .ToListAsync();
+
+            return likedReviews;
+        }
+
+        /// <summary>
+        /// Gets reviews that a profile has commented on, including their embeddings
+        /// </summary>
+        public async Task<List<Review>> GetCommentedReviewsWithEmbeddingsAsync(Guid profileId) {
+            var commentedReviewIds = await _context.Comments
+                .Where(c => c.ProfileId == profileId)
+                .Select(c => c.ReviewId)
+                .Distinct()
+                .ToListAsync();
+
+            var commentedReviews = await _context.Reviews
+                .Where(r => commentedReviewIds.Contains(r.Id))
+                .ToListAsync();
+
+            return commentedReviews;
+        }
+
+        /// <summary>
+        /// Gets reviews with embeddings similar to the provided embedding, excluding any already displayed to the user
+        /// </summary>
+        /// <param name="embedding">The embedding vector to match against</param>
+        /// <param name="count">Number of reviews to return</param>
+        /// <param name="excludedReviewIds">Optional list of review IDs to exclude from results</param>
+        /// <returns>List of similar reviews with their embeddings</returns>
+        public async Task<List<Review>> GetSimilarReviewsAsync(Vector embedding, int count, List<Guid>? excludedReviewIds = null) {
+            // Base query with embedding similarity using cosine distance
+            var query = _context.Reviews.Where(r => r.Embedding != null);
+
+            // If we have excluded review IDs, filter them out
+            if (excludedReviewIds != null && excludedReviewIds.Any()) {
+                query = query.Where(r => !excludedReviewIds.Contains(r.Id));
+            }
+
+            // Order by similarity and take the requested number
+            var reviews = await query
+                .OrderBy(r => r.Embedding.CosineDistance(embedding))
+                .Take(count)
+                .ToListAsync();
+
+            return reviews;
+        }
+
+
+        /// <summary>
+        /// Gets all user interactions (reviews, likes, comments) with embeddings in one request
+        /// </summary>
+        public async Task<UserInteractionsResponse> GetUserInteractionsWithEmbeddingsAsync(Guid profileId) {
+            // Get the user's own reviews with embeddings
+            var userReviews = await GetReviewsWithEmbeddingsAsync(profileId);
+
+            // Get reviews the user has liked with embeddings
+            var likedReviews = await GetLikedReviewsWithEmbeddingsAsync(profileId);
+
+            // Get reviews the user has commented on with embeddings
+            var commentedReviews = await GetCommentedReviewsWithEmbeddingsAsync(profileId);
+
+            return new UserInteractionsResponse {
+                OwnReviews = userReviews,
+                LikedReviews = likedReviews,
+                CommentedReviews = commentedReviews
             };
         }
 

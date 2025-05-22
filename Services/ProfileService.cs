@@ -148,5 +148,30 @@ namespace poplensUserProfileApi.Services {
 
             return followedProfiles;
         }
+
+        /// <summary>
+        /// Gets a list of profiles with their usernames for the given profile IDs
+        /// </summary>
+        /// <param name="profileIds">List of profile IDs to fetch</param>
+        /// <param name="token">Authorization token for API calls</param>
+        /// <returns>List of FollowedProfile objects with ProfileId and Username</returns>
+        public async Task<List<FollowedProfile>> GetProfilesWithUsernamesAsync(List<Guid> profileIds, string token) {
+            // Get the user IDs associated with the given profile IDs
+            var userIds = await _context.Profiles
+                .Where(p => profileIds.Contains(p.Id))
+                .Select(p => p.UserId)
+                .ToListAsync();
+
+            Dictionary<Guid, string> usernames = await _userAuthenticationApiProxyService.GetUsernamesByUserIdsAsync(userIds, token);
+            // Map the results to FollowedProfile objects
+            var followedProfiles = profileIds.Select(id => {
+                var userId = _context.Profiles.FirstOrDefault(p => p.Id == id)?.UserId;
+                return new FollowedProfile {
+                    ProfileId = id,
+                    Username = userId != null && usernames.ContainsKey(Guid.Parse(userId)) ? usernames[Guid.Parse(userId)] : "Unknown"
+                };
+            }).ToList();
+            return followedProfiles;
+        }
     }
 }

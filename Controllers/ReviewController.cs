@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Pgvector;
 using poplensUserProfileApi.Contracts;
 using poplensUserProfileApi.Models;
 using poplensUserProfileApi.Models.Dtos;
+using poplensUserProfileApi.Models.Feed;
 
 namespace poplensUserProfileApi.Controllers {
     [Route("api/[controller]")]
@@ -99,6 +101,59 @@ namespace poplensUserProfileApi.Controllers {
             var reviews = await _reviewService.GetMediaReviews(mediaId, page, pageSize, sortOption, token);
             return Ok(reviews);
         }
+
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        [HttpGet("{profileId}/GetReviewsWithEmbeddings")]
+        public async Task<IActionResult> GetReviewsWithEmbeddings(Guid profileId) {
+            var reviews = await _reviewService.GetReviewsWithEmbeddingsAsync(profileId);
+            return Ok(reviews);
+        }
+
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        [HttpGet("{profileId}/GetLikedReviewsWithEmbeddings")]
+        public async Task<IActionResult> GetLikedReviewsWithEmbeddings(Guid profileId) {
+            var reviews = await _reviewService.GetLikedReviewsWithEmbeddingsAsync(profileId);
+            return Ok(reviews);
+        }
+
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        [HttpGet("{profileId}/GetCommentedReviewsWithEmbeddings")]
+        public async Task<IActionResult> GetCommentedReviewsWithEmbeddings(Guid profileId) {
+            var reviews = await _reviewService.GetCommentedReviewsWithEmbeddingsAsync(profileId);
+            return Ok(reviews);
+        }
+
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        [HttpPost("GetSimilarReviews")]
+        public async Task<IActionResult> GetSimilarReviews([FromBody] SimilarReviewRequest request) {
+            if (request == null || request.Embedding == null || request.Count <= 0) {
+                return BadRequest("Invalid request parameters");
+            }
+
+            // Convert the float array to a Vector object
+            var embedding = new Vector(new ReadOnlyMemory<float>(request.Embedding));
+
+            var reviews = await _reviewService.GetSimilarReviewsAsync(
+                embedding,
+                request.Count,
+                request.ExcludedReviewIds);
+
+            return Ok(reviews);
+        }
+
+
+        [Authorize(AuthenticationSchemes = "Bearer")]
+        [HttpGet("{profileId}/GetUserInteractions")]
+        public async Task<IActionResult> GetUserInteractions(Guid profileId) {
+            try {
+                var interactions = await _reviewService.GetUserInteractionsWithEmbeddingsAsync(profileId);
+                return Ok(interactions);
+            } catch (Exception ex) {
+                return StatusCode(500, $"Error retrieving user interactions: {ex.Message}");
+            }
+        }
+
+
 
         [Authorize(AuthenticationSchemes = "Bearer")]
         [HttpPost("{profileId}/{reviewId}/Like")]

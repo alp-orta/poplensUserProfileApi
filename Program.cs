@@ -18,6 +18,7 @@ builder.Services.AddScoped<IProfileService, ProfileService>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<IUserAuthenticationApiProxyService, UserAuthenticationApiProxyService>();
 builder.Services.AddScoped<IMediaApiProxyService, MediaApiProxyService>();
+builder.Services.AddScoped<IEmbeddingProxyService, EmbeddingProxyService>();
 builder.Services.AddHttpClient();
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

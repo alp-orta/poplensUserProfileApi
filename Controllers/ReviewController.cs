@@ -47,6 +47,20 @@ namespace poplensUserProfileApi.Controllers {
             return NoContent();
         }
 
+        /// <summary>
+        /// Updates all reviews missing embeddings.
+        /// </summary>
+        [HttpPost("update-missing-embeddings")]
+        public async Task<IActionResult> UpdateMissingEmbeddings([FromHeader(Name = "Authorization")] string authorization) {
+            // Extract the token (assumes "Bearer ..." format)
+            var token = authorization?.Replace("Bearer ", "");
+            if (string.IsNullOrWhiteSpace(token))
+                return Unauthorized("Missing or invalid Authorization header.");
+
+            var updatedCount = await _reviewService.UpdateMissingReviewEmbeddingsAsync(token);
+            return Ok(new { updatedCount });
+        }
+
         [Authorize(AuthenticationSchemes = "Bearer")]
         [HttpDelete("{profileId}/DeleteReview/{mediaId}")]
         public async Task<IActionResult> DeleteReview(Guid profileId, string mediaId) {

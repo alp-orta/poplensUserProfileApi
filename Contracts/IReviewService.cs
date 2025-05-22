@@ -7,6 +7,7 @@ namespace poplensUserProfileApi.Contracts {
         Task<Review> GetReviewByIdAsync(Guid reviewId);
         Task<ReviewDetail> GetReviewDetailAsync(Guid reviewId, string token);
         Task AddReviewAsync(Guid profileId, CreateReviewRequest request, string token);
+        Task<int> UpdateMissingReviewEmbeddingsAsync(string token);
         Task<bool> DeleteReviewAsync(Guid profileId, string mediaId);
         Task<List<Review>> GetReviewsByProfileIdAsync(Guid profileId, int page = 1, int pageSize = 10); 
         Task<List<Review>> GetReviewsByProfileIdsAsync(List<Guid> profileIds, int page = 1, int pageSize = 10);

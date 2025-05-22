@@ -15,11 +15,13 @@ namespace poplensUserProfileApi.Services
         private readonly UserProfileDbContext _context;
         private readonly IUserAuthenticationApiProxyService _userAuthenticationApiProxyService;
         private readonly IMediaApiProxyService _mediaApiProxyService;
+        private readonly IEmbeddingProxyService _embeddingProxyService;
 
-        public ReviewService(UserProfileDbContext context, IUserAuthenticationApiProxyService userAuthenticationApiProxyService, IMediaApiProxyService mediaApiProxyService) {
+        public ReviewService(UserProfileDbContext context, IUserAuthenticationApiProxyService userAuthenticationApiProxyService, IMediaApiProxyService mediaApiProxyService, IEmbeddingProxyService embeddingProxyService) {
             _context = context;
             _userAuthenticationApiProxyService = userAuthenticationApiProxyService;
             _mediaApiProxyService = mediaApiProxyService;
+            _embeddingProxyService = embeddingProxyService;
         }
         
         // ────────────────────────────────────────────────────────────
@@ -124,10 +126,15 @@ namespace poplensUserProfileApi.Services
             var existingReview = await _context.Reviews
                 .FirstOrDefaultAsync(r => r.ProfileId == profileId && r.MediaId == request.MediaId);
 
+            var media = await _mediaApiProxyService.GetMediaByIdAsync(new Guid(request.MediaId), token);
+            var embeddingInputText = "Type: " + media.Type + "; " + "Title: " + media.Title + "; " + "Genre: " + media.Genre + "; " + "Review: " + request.Content + ";";
+            var embedding = await _embeddingProxyService.GetEmbeddingAsync(embeddingInputText);
+
             if (existingReview != null) {
                 existingReview.Content = request.Content;
                 existingReview.Rating = request.Rating;
                 existingReview.LastUpdatedDate = DateTime.UtcNow;
+                existingReview.Embedding = embedding;
                 await _context.SaveChangesAsync();
                 return;
             }
@@ -141,12 +148,45 @@ namespace poplensUserProfileApi.Services
                 Content = request.Content,
                 Rating = request.Rating,
                 CreatedDate = DateTime.UtcNow,
-                LastUpdatedDate = DateTime.UtcNow
+                LastUpdatedDate = DateTime.UtcNow,
+                Embedding = embedding
             };
 
             _context.Reviews.Add(review);
             await _context.SaveChangesAsync();
         }
+
+        public async Task<int> UpdateMissingReviewEmbeddingsAsync(string token) {
+            // Find reviews where Embedding is null
+            var reviewsWithoutEmbedding = await _context.Reviews
+                .Where(r => r.Embedding == null)
+                .ToListAsync();
+
+            int updatedCount = 0;
+
+            foreach (var review in reviewsWithoutEmbedding) {
+                // Get the related media for context
+                var media = await _mediaApiProxyService.GetMediaByIdAsync(new Guid(review.MediaId), token);
+                if (media == null)
+                    continue;
+
+                // Compose the embedding input text as in AddReviewAsync
+                var embeddingInputText = $"Type: {media.Type}; Title: {media.Title}; Genre: {media.Genre}; Review: {review.Content};";
+                var embedding = await _embeddingProxyService.GetEmbeddingAsync(embeddingInputText);
+
+                if (embedding != null) {
+                    review.Embedding = embedding;
+                    updatedCount++;
+                }
+            }
+
+            if (updatedCount > 0) {
+                await _context.SaveChangesAsync();
+            }
+
+            return updatedCount;
+        }
+
 
         public async Task<bool> DeleteReviewAsync(Guid profileId, string mediaId) {
             var review = await _context.Reviews

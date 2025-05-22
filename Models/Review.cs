@@ -10,7 +10,7 @@ namespace poplensUserProfileApi.Models {
         public string MediaId { get; set; } // Reference to the specific media item (movie, book, etc.)
         public DateTime CreatedDate { get; set; } // The date the review was created
         public DateTime LastUpdatedDate { get; set; } // The date the review was last updated
-        [Column(TypeName = "vector(1536)")]
+        [Column(TypeName = "vector(384)")]
         public Vector? Embedding { get; set; } 
     }
 }

@@ -36,7 +36,7 @@ namespace poplensUserProfileApi.Data {
 
             modelBuilder.Entity<Review>()
                 .Property(r => r.Embedding)
-                .HasColumnType("vector(1536)");
+                .HasColumnType("vector(384)");
 
             modelBuilder.ApplyConfiguration(new CommentConfiguration());
             modelBuilder.ApplyConfiguration(new LikeConfiguration());
